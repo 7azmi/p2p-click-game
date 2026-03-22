@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P2P Click Race Game</title>
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+  button { font-size: 1.2em; margin: 10px; padding: 10px 20px; }
+  input { font-size: 1em; padding: 5px; }
+</style>
+</head>
+<body>
+
+<h1>P2P Click Race</h1>
+
+<div>
+  <h2>Your ID: <span id="myId">...</span></h2>
+  <input id="peerIdInput" placeholder="Enter opponent ID">
+  <button id="connectBtn">Connect</button>
+</div>
+
+<div>
+  <button id="clickBtn" disabled>Click me!</button>
+  <p>My clicks: <span id="myClicks">0</span></p>
+  <p>Opponent clicks: <span id="opponentClicks">0</span></p>
+</div>
+
+<script>
+  // Initialize PeerJS
+  const peer = new Peer();
+  let conn;
+  let myClicks = 0;
+  let opponentClicks = 0;
+
+  // Show your ID
+  peer.on('open', id => {
+    document.getElementById('myId').textContent = id;
+  });
+
+  // Handle incoming connections
+  peer.on('connection', incomingConn => {
+    conn = incomingConn;
+    setupConnection();
+  });
+
+  // Connect to opponent
+  document.getElementById('connectBtn').onclick = () => {
+    const opponentId = document.getElementById('peerIdInput').value;
+    if (!opponentId) return alert('Enter opponent ID!');
+    conn = peer.connect(opponentId);
+    setupConnection();
+  };
+
+  function setupConnection() {
+    conn.on('open', () => {
+      alert('Connected! You can start clicking.');
+      document.getElementById('clickBtn').disabled = false;
+    });
+
+    conn.on('data', data => {
+      if (data.type === 'click') {
+        opponentClicks = data.count;
+        document.getElementById('opponentClicks').textContent = opponentClicks;
+
+        if (opponentClicks >= 10) alert('You lose!');
+      }
+    });
+
+    conn.on('close', () => {
+      alert('Connection closed');
+      document.getElementById('clickBtn').disabled = true;
+    });
+  }
+
+  // Send clicks to opponent
+  document.getElementById('clickBtn').onclick = () => {
+    myClicks++;
+    document.getElementById('myClicks').textContent = myClicks;
+
+    if (conn && conn.open) {
+      conn.send({ type: 'click', count: myClicks });
+    }
+
+    if (myClicks >= 10) alert('You win!');
+  };
+</script>
+
+</body>
+</html>
