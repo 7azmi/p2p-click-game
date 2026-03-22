@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>P2P Click Race Game</title>
+<title>P2P Click Race Game with Latency</title>
 <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 <style>
   body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
@@ -25,27 +25,27 @@
   <button id="clickBtn" disabled>Click me!</button>
   <p>My clicks: <span id="myClicks">0</span></p>
   <p>Opponent clicks: <span id="opponentClicks">0</span></p>
+  <p>Ping latency: <span id="latency">--</span> ms</p>
 </div>
 
 <script>
-  // Initialize PeerJS
   const peer = new Peer();
   let conn;
   let myClicks = 0;
   let opponentClicks = 0;
 
-  // Show your ID
+  // Ping tracking
+  let lastPingTime = 0;
+
   peer.on('open', id => {
     document.getElementById('myId').textContent = id;
   });
 
-  // Handle incoming connections
   peer.on('connection', incomingConn => {
     conn = incomingConn;
     setupConnection();
   });
 
-  // Connect to opponent
   document.getElementById('connectBtn').onclick = () => {
     const opponentId = document.getElementById('peerIdInput').value;
     if (!opponentId) return alert('Enter opponent ID!');
@@ -57,24 +57,35 @@
     conn.on('open', () => {
       alert('Connected! You can start clicking.');
       document.getElementById('clickBtn').disabled = false;
+      startPing();
     });
 
     conn.on('data', data => {
+      // Click updates
       if (data.type === 'click') {
         opponentClicks = data.count;
         document.getElementById('opponentClicks').textContent = opponentClicks;
-
         if (opponentClicks >= 10) alert('You lose!');
+      }
+
+      // Ping-pong
+      if (data.type === 'ping') {
+        // Send pong back with the same timestamp
+        conn.send({ type: 'pong', timestamp: data.timestamp });
+      }
+      if (data.type === 'pong') {
+        const latency = Date.now() - data.timestamp;
+        document.getElementById('latency').textContent = latency;
       }
     });
 
     conn.on('close', () => {
       alert('Connection closed');
       document.getElementById('clickBtn').disabled = true;
+      document.getElementById('latency').textContent = '--';
     });
   }
 
-  // Send clicks to opponent
   document.getElementById('clickBtn').onclick = () => {
     myClicks++;
     document.getElementById('myClicks').textContent = myClicks;
@@ -85,6 +96,16 @@
 
     if (myClicks >= 10) alert('You win!');
   };
+
+  // Ping loop every 2 seconds
+  function startPing() {
+    setInterval(() => {
+      if (conn && conn.open) {
+        const timestamp = Date.now();
+        conn.send({ type: 'ping', timestamp });
+      }
+    }, 2000);
+  }
 </script>
 
 </body>
